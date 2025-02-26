@@ -260,6 +260,20 @@ function drawNextPiece() {
   });
 }
 
+// Hard drop function
+function hardDrop() {
+  while (!checkCollision()) {
+    piece.pos.y++;
+  }
+  piece.pos.y--;
+  mergePiece();
+  clearLines();
+  piece = nextPiece;
+  nextPiece = createPiece();
+  drawNextPiece();
+  dropCounter = 0;
+}
+
 // Game loop
 function update(time = 0) {
   if (gameOver) {
@@ -341,6 +355,9 @@ function init() {
         if (checkCollision()) {
           piece.pos.y--;
         }
+        break;
+      case "ArrowUp":
+        hardDrop();
         break;
       case "z":
         rotatePiece(-1);
