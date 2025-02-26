@@ -1,3 +1,5 @@
+import settingsManager from "./settings-manager.js";
+
 // Canvas setup
 const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
@@ -5,7 +7,7 @@ const nextPieceCanvas = document.getElementById("next-piece");
 const nextPieceCtx = nextPieceCanvas.getContext("2d");
 const menuOverlay = document.getElementById("menu-overlay");
 const playButton = document.getElementById("play-button");
-const musicBoxes = document.querySelectorAll(".music-box");
+const optionsButton = document.getElementById("options-button");
 const titleMusic = document.getElementById("title-music");
 const gameMusic = document.getElementById("game-music");
 const gameMusicOther = document.getElementById("game-music-other");
@@ -17,12 +19,10 @@ console.log("Game music element:", gameMusic);
 // Add music loading listeners
 titleMusic.addEventListener("loadeddata", () => {
   console.log("Title music loaded successfully");
-  titleMusic.volume = 1.0; // Ensure volume is set
 });
 
 gameMusic.addEventListener("loadeddata", () => {
   console.log("Game music loaded successfully");
-  gameMusic.volume = 1.0; // Ensure volume is set
 });
 
 titleMusic.addEventListener("error", (e) => {
@@ -106,6 +106,29 @@ let isPaused = false;
 let dropCounter = 0;
 let lastTime = 0;
 let gameStarted = false;
+
+// Load settings
+async function loadSettings() {
+  return await settingsManager.loadSettings();
+}
+
+// Apply audio settings
+async function applyAudioSettings() {
+  const settings = await loadSettings();
+  const musicVolume = settings.musicVolume / 100;
+
+  // Apply volume to all music elements
+  titleMusic.volume = musicVolume;
+  gameMusic.volume = musicVolume;
+  gameMusicOther.volume = musicVolume;
+
+  console.log("Applied volume settings:", {
+    musicVolume: settings.musicVolume,
+    titleMusicVolume: titleMusic.volume,
+    gameMusicVolume: gameMusic.volume,
+    gameMusicOtherVolume: gameMusicOther.volume,
+  });
+}
 
 // Create empty game board
 function createBoard() {
@@ -339,14 +362,13 @@ function resetGame() {
 }
 
 // Function to get current game music element
-function getCurrentGameMusic() {
-  switch (currentGameTrack) {
-    case "traditional":
+async function getCurrentGameMusic() {
+  const settings = await loadSettings();
+  switch (settings.gameMusic) {
+    case "classic1":
       return gameMusic;
-    case "other":
+    case "classic2":
       return gameMusicOther;
-    case "none":
-      return null;
     default:
       return gameMusic;
   }
@@ -360,8 +382,11 @@ function switchMusic(from, to) {
   }
 
   if (to) {
-    to.play().catch((error) => {
-      console.error(`Error playing audio:`, error);
+    // Apply current volume settings before playing
+    applyAudioSettings().then(() => {
+      to.play().catch((error) => {
+        console.error(`Error playing audio:`, error);
+      });
     });
   }
 }
@@ -400,30 +425,36 @@ function previewTrack(track) {
 }
 
 // Initialize game
-function init() {
+async function init() {
+  // Apply audio settings first
+  await applyAudioSettings();
+
   // Don't start the game immediately
   resetGame();
 
   // Start playing title music
+  console.log("Starting title music");
   switchMusic(null, titleMusic);
 
-  // Music selection handler
-  musicBoxes.forEach((box) => {
-    box.addEventListener("click", () => {
-      // Update selection visually
-      musicBoxes.forEach((b) => b.classList.remove("selected"));
-      box.classList.add("selected");
+  // Options button handler
+  optionsButton.addEventListener("click", () => {
+    console.log("Options button clicked");
+    // Stop title music
+    titleMusic.pause();
+    titleMusic.currentTime = 0;
 
-      // Update current track
-      currentGameTrack = box.dataset.track;
+    // Navigate to options page
+    window.location.href = "options.html";
+  });
 
-      // Preview the track
-      previewTrack(currentGameTrack);
-    });
+  // Play button click handler
+  playButton.addEventListener("click", () => {
+    console.log("Play button clicked");
+    startGame();
   });
 
   // Event listeners
-  document.addEventListener("keydown", (event) => {
+  document.addEventListener("keydown", async (event) => {
     if (!gameStarted || gameOver) return;
 
     if (event.key === "p" || event.key === "P") {
@@ -433,7 +464,7 @@ function init() {
         lastTime = performance.now();
         dropCounter = 0;
         // Resume game music if not in "none" mode
-        const currentMusic = getCurrentGameMusic();
+        const currentMusic = await getCurrentGameMusic();
         if (currentMusic) {
           currentMusic.play().catch((error) => {
             console.log("Audio playback failed:", error);
@@ -472,32 +503,18 @@ function init() {
         break;
     }
   });
-
-  // Play button click handler
-  playButton.addEventListener("click", () => {
-    // Clear any preview that might be playing
-    if (previewTimeout) {
-      clearTimeout(previewTimeout);
-      previewTimeout = null;
-    }
-    gameMusic.pause();
-    gameMusic.currentTime = 0;
-    gameMusicOther.pause();
-    gameMusicOther.currentTime = 0;
-
-    startGame();
-  });
 }
 
 // Start game
-function startGame() {
+async function startGame() {
   console.log("Starting game, attempting to switch music");
+  const gameTrackElement = await getCurrentGameMusic();
   console.log("Current game music state:", {
-    element: getCurrentGameMusic(),
-    src: getCurrentGameMusic().querySelector("source").src,
-    paused: getCurrentGameMusic().paused,
-    currentTime: getCurrentGameMusic().currentTime,
-    readyState: getCurrentGameMusic().readyState,
+    element: gameTrackElement,
+    src: gameTrackElement.querySelector("source").src,
+    paused: gameTrackElement.paused,
+    currentTime: gameTrackElement.currentTime,
+    readyState: gameTrackElement.readyState,
   });
 
   resetGame();
@@ -507,16 +524,15 @@ function startGame() {
   drawNextPiece();
   menuOverlay.style.display = "none";
 
-  // Switch to game music (or no music if "none" is selected)
-  const gameTrack = getCurrentGameMusic();
-  switchMusic(titleMusic, gameTrack);
+  // Switch to game music
+  switchMusic(titleMusic, gameTrackElement);
 
   lastTime = performance.now();
   update();
 }
 
 // Game loop
-function update(time = 0) {
+async function update(time = 0) {
   if (!gameStarted) return;
 
   if (gameOver) {
@@ -528,11 +544,11 @@ function update(time = 0) {
     ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
 
     // Show menu after a short delay
-    setTimeout(() => {
+    setTimeout(async () => {
       gameStarted = false;
       menuOverlay.style.display = "flex";
       // Switch back to title music
-      switchMusic(getCurrentGameMusic(), titleMusic);
+      switchMusic(await getCurrentGameMusic(), titleMusic);
     }, 2000);
     return;
   }
@@ -563,7 +579,8 @@ function update(time = 0) {
     ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
 
     // Pause game music
-    getCurrentGameMusic().pause();
+    const currentMusic = await getCurrentGameMusic();
+    currentMusic.pause();
   }
 
   requestAnimationFrame(update);

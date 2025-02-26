@@ -1,8 +1,8 @@
 {
   "name": "shapes-invader",
   "version": "1.0.0",
-  "description": "tetris puzzler",
-  "main": "main.js",
+  "description": "Puzzle-y Tetris",
+  "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,6 +11,6 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^34.2.0"
+    "electron": "^28.0.0"
   }
 }

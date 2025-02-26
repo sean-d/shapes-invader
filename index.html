@@ -88,10 +88,24 @@
         padding: 10px;
       }
 
+      .menu-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+
       .menu-label {
         color: white;
         font-size: 20px;
-        margin: 5px 0 15px 0;
+        margin: 5px 0;
+      }
+
+      .menu-title {
+        color: white;
+        font-size: 48px;
+        margin-bottom: 30px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
       }
 
       .music-selection {
@@ -123,13 +137,6 @@
         border-color: #2980b9;
         box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
       }
-
-      .menu-title {
-        color: white;
-        font-size: 48px;
-        margin-bottom: 30px;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-      }
     </style>
   </head>
   <body>
@@ -145,16 +152,19 @@
     <div id="game-container">
       <div id="menu-overlay">
         <h1 class="menu-title">TETRIS</h1>
-        <div>
-          <div class="menu-label">Game Music:</div>
-          <div class="music-selection">
-            <div class="music-box selected" data-track="traditional">
-              Traditional
-            </div>
-            <div class="music-box" data-track="other">Alternative</div>
-            <div class="music-box" data-track="none">None</div>
-          </div>
+        <div class="menu-group">
+          <label class="menu-label" for="mode-select">Mode</label>
+          <select id="mode-select" class="menu-select">
+            <option value="classic">Classic</option>
+          </select>
         </div>
+        <div class="menu-group">
+          <label class="menu-label" for="level-select">Level</label>
+          <select id="level-select" class="menu-select">
+            <option value="1">1</option>
+          </select>
+        </div>
+        <button class="menu-button" id="options-button">Options</button>
         <button class="menu-button" id="play-button">Play</button>
       </div>
       <canvas id="game-canvas" width="300" height="600"></canvas>
@@ -173,6 +183,6 @@
         </div>
       </div>
     </div>
-    <script src="game.js"></script>
+    <script type="module" src="game.js"></script>
   </body>
 </html>
