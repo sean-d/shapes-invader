@@ -56,6 +56,7 @@ let nextPiece = null;
 let score = 0;
 let level = 1;
 let gameOver = false;
+let isPaused = false;
 let dropCounter = 0;
 let lastTime = 0;
 
@@ -271,20 +272,34 @@ function update(time = 0) {
     return;
   }
 
-  const deltaTime = time - lastTime;
-  lastTime = time;
+  if (!isPaused) {
+    const deltaTime = time - lastTime;
+    lastTime = time;
 
-  dropCounter += deltaTime;
-  if (dropCounter > 1000 - level * 50) {
-    dropPiece();
+    dropCounter += deltaTime;
+    if (dropCounter > 1000 - level * 50) {
+      dropPiece();
+    }
+
+    // Clear canvas
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawBoard();
+    drawPiece();
+  } else {
+    // Draw pause overlay
+    // First draw a semi-transparent layer over the existing game state
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw PAUSED text
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 48px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
   }
-
-  // Clear canvas
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  drawBoard();
-  drawPiece();
 
   requestAnimationFrame(update);
 }
@@ -298,6 +313,19 @@ function init() {
   // Event listeners
   document.addEventListener("keydown", (event) => {
     if (gameOver) return;
+
+    if (event.key === "p" || event.key === "P") {
+      isPaused = !isPaused;
+      if (!isPaused) {
+        // Reset lastTime to prevent huge delta on unpause
+        lastTime = performance.now();
+        dropCounter = 0;
+      }
+      return;
+    }
+
+    // Don't process other keys if game is paused
+    if (isPaused) return;
 
     switch (event.key) {
       case "ArrowLeft":
