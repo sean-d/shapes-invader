@@ -5,6 +5,50 @@ const nextPieceCanvas = document.getElementById("next-piece");
 const nextPieceCtx = nextPieceCanvas.getContext("2d");
 const menuOverlay = document.getElementById("menu-overlay");
 const playButton = document.getElementById("play-button");
+const musicBoxes = document.querySelectorAll(".music-box");
+const titleMusic = document.getElementById("title-music");
+const gameMusic = document.getElementById("game-music");
+const gameMusicOther = document.getElementById("game-music-other");
+
+// Debug music elements
+console.log("Title music element:", titleMusic);
+console.log("Game music element:", gameMusic);
+
+// Add music loading listeners
+titleMusic.addEventListener("loadeddata", () => {
+  console.log("Title music loaded successfully");
+  titleMusic.volume = 1.0; // Ensure volume is set
+});
+
+gameMusic.addEventListener("loadeddata", () => {
+  console.log("Game music loaded successfully");
+  gameMusic.volume = 1.0; // Ensure volume is set
+});
+
+titleMusic.addEventListener("error", (e) => {
+  console.error("Error loading title music:", e);
+  console.error("Title music source:", titleMusic.querySelector("source").src);
+});
+
+gameMusic.addEventListener("error", (e) => {
+  console.error("Error loading game music:", e);
+  console.error("Game music source:", gameMusic.querySelector("source").src);
+});
+
+// Add play state listeners
+titleMusic.addEventListener("play", () =>
+  console.log("Title music started playing")
+);
+gameMusic.addEventListener("play", () =>
+  console.log("Game music started playing")
+);
+
+titleMusic.addEventListener("pause", () => console.log("Title music paused"));
+gameMusic.addEventListener("pause", () => console.log("Game music paused"));
+
+// Audio state
+let currentGameTrack = "traditional";
+let previewTimeout = null;
 
 // Game constants
 const BLOCK_SIZE = 30;
@@ -294,10 +338,89 @@ function resetGame() {
   document.getElementById("level").textContent = "1";
 }
 
+// Function to get current game music element
+function getCurrentGameMusic() {
+  switch (currentGameTrack) {
+    case "traditional":
+      return gameMusic;
+    case "other":
+      return gameMusicOther;
+    case "none":
+      return null;
+    default:
+      return gameMusic;
+  }
+}
+
+// Function to handle music transitions
+function switchMusic(from, to) {
+  if (from) {
+    from.pause();
+    from.currentTime = 0;
+  }
+
+  if (to) {
+    to.play().catch((error) => {
+      console.error(`Error playing audio:`, error);
+    });
+  }
+}
+
+// Function to preview music track
+function previewTrack(track) {
+  // Clear any existing preview timeout
+  if (previewTimeout) {
+    clearTimeout(previewTimeout);
+  }
+
+  // Stop any currently playing preview
+  gameMusic.pause();
+  gameMusic.currentTime = 0;
+  gameMusicOther.pause();
+  gameMusicOther.currentTime = 0;
+
+  const trackElement =
+    track === "traditional"
+      ? gameMusic
+      : track === "other"
+      ? gameMusicOther
+      : null;
+
+  if (trackElement) {
+    trackElement
+      .play()
+      .catch((error) => console.error("Preview playback failed:", error));
+
+    // Stop preview after 10 seconds
+    previewTimeout = setTimeout(() => {
+      trackElement.pause();
+      trackElement.currentTime = 0;
+    }, 10000);
+  }
+}
+
 // Initialize game
 function init() {
   // Don't start the game immediately
   resetGame();
+
+  // Start playing title music
+  switchMusic(null, titleMusic);
+
+  // Music selection handler
+  musicBoxes.forEach((box) => {
+    box.addEventListener("click", () => {
+      // Update selection visually
+      musicBoxes.forEach((b) => b.classList.remove("selected"));
+      box.classList.add("selected");
+
+      // Update current track
+      currentGameTrack = box.dataset.track;
+
+      // Preview the track
+      previewTrack(currentGameTrack);
+    });
+  });
 
   // Event listeners
   document.addEventListener("keydown", (event) => {
@@ -309,6 +432,13 @@ function init() {
         // Reset lastTime to prevent huge delta on unpause
         lastTime = performance.now();
         dropCounter = 0;
+        // Resume game music if not in "none" mode
+        const currentMusic = getCurrentGameMusic();
+        if (currentMusic) {
+          currentMusic.play().catch((error) => {
+            console.log("Audio playback failed:", error);
+          });
+        }
       }
       return;
     }
@@ -344,17 +474,43 @@ function init() {
   });
 
   // Play button click handler
-  playButton.addEventListener("click", startGame);
+  playButton.addEventListener("click", () => {
+    // Clear any preview that might be playing
+    if (previewTimeout) {
+      clearTimeout(previewTimeout);
+      previewTimeout = null;
+    }
+    gameMusic.pause();
+    gameMusic.currentTime = 0;
+    gameMusicOther.pause();
+    gameMusicOther.currentTime = 0;
+
+    startGame();
+  });
 }
 
 // Start game
 function startGame() {
+  console.log("Starting game, attempting to switch music");
+  console.log("Current game music state:", {
+    element: getCurrentGameMusic(),
+    src: getCurrentGameMusic().querySelector("source").src,
+    paused: getCurrentGameMusic().paused,
+    currentTime: getCurrentGameMusic().currentTime,
+    readyState: getCurrentGameMusic().readyState,
+  });
+
   resetGame();
   gameStarted = true;
-  menuOverlay.style.display = "none";
   piece = createPiece();
   nextPiece = createPiece();
   drawNextPiece();
+  menuOverlay.style.display = "none";
+
+  // Switch to game music (or no music if "none" is selected)
+  const gameTrack = getCurrentGameMusic();
+  switchMusic(titleMusic, gameTrack);
+
   lastTime = performance.now();
   update();
 }
@@ -375,6 +531,8 @@ function update(time = 0) {
     setTimeout(() => {
       gameStarted = false;
       menuOverlay.style.display = "flex";
+      // Switch back to title music
+      switchMusic(getCurrentGameMusic(), titleMusic);
     }, 2000);
     return;
   }
@@ -403,6 +561,9 @@ function update(time = 0) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
+
+    // Pause game music
+    getCurrentGameMusic().pause();
   }
 
   requestAnimationFrame(update);
