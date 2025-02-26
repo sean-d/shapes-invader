@@ -1,7 +1,7 @@
 // Default settings
 const defaultSettings = {
   gameMusic: "classic1",
-  musicVolume: 100,
+  musicVolume: 40,
   sfxVolume: 100,
 };
 

@@ -7,6 +7,8 @@ const musicButtons = document.querySelectorAll(".music-button");
 const musicVolume = document.getElementById("music-volume");
 const sfxVolume = document.getElementById("sfx-volume");
 const backButton = document.getElementById("back-button");
+const musicValueDisplay = document.getElementById("music-value");
+const sfxValueDisplay = document.getElementById("sfx-value");
 
 // Preview timeout
 let previewTimeout = null;
@@ -28,6 +30,12 @@ async function saveSettings(settings) {
   await settingsManager.saveSettings(settings);
 }
 
+// Update value displays
+function updateValueDisplays() {
+  musicValueDisplay.textContent = musicVolume.value;
+  sfxValueDisplay.textContent = sfxVolume.value;
+}
+
 // Apply settings to UI
 async function applySettings(settings) {
   // Set music selection
@@ -41,6 +49,7 @@ async function applySettings(settings) {
   // Set volume values
   musicVolume.value = settings.musicVolume;
   sfxVolume.value = settings.sfxVolume;
+  updateValueDisplays();
 
   // Apply volume to preview music
   previewMusic1.volume = settings.musicVolume / 100;
@@ -83,22 +92,21 @@ musicButtons.forEach((button) => {
 
 // Handle volume changes
 musicVolume.addEventListener("input", async () => {
-  const volume = musicVolume.value / 100;
-
-  // Apply volume to preview music
-  previewMusic1.volume = volume;
-  previewMusic2.volume = volume;
-
-  // Save settings
-  const settings = await loadSettings();
+  updateValueDisplays();
+  const settings = await settingsManager.loadSettings();
   settings.musicVolume = parseInt(musicVolume.value);
-  await saveSettings(settings);
+  await settingsManager.saveSettings(settings);
+
+  // Update preview volumes
+  previewMusic1.volume = settings.musicVolume / 100;
+  previewMusic2.volume = settings.musicVolume / 100;
 });
 
 sfxVolume.addEventListener("input", async () => {
-  const settings = await loadSettings();
+  updateValueDisplays();
+  const settings = await settingsManager.loadSettings();
   settings.sfxVolume = parseInt(sfxVolume.value);
-  await saveSettings(settings);
+  await settingsManager.saveSettings(settings);
 });
 
 // Handle back button

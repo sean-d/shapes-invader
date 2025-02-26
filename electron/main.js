@@ -41,7 +41,7 @@ async function loadSettings() {
     // If file doesn't exist or is invalid, return default settings
     return {
       gameMusic: "classic1",
-      musicVolume: 100,
+      musicVolume: 40,
       sfxVolume: 100,
     };
   }
