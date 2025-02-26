@@ -273,7 +273,51 @@ function clearLines() {
     if (score >= level * 1000) {
       level++;
       document.getElementById("level").textContent = level;
+      // Update highest level if we've reached a new high
+      updateHighestLevel(level);
     }
+  }
+}
+
+// Update highest level reached
+async function updateHighestLevel(newLevel) {
+  try {
+    console.log("Updating highest level to:", newLevel); // Debug log
+    const settings = await loadSettings();
+    console.log("Current settings:", settings); // Debug log
+
+    if (newLevel > settings.highestLevel) {
+      settings.highestLevel = newLevel;
+      await settingsManager.saveSettings(settings);
+      console.log("Saved new highest level:", newLevel); // Debug log
+
+      // Update level select options
+      updateLevelSelectOptions(settings.highestLevel);
+    }
+  } catch (error) {
+    console.error("Error updating highest level:", error);
+  }
+}
+
+// Update level select dropdown options
+function updateLevelSelectOptions(maxLevel) {
+  const levelSelect = document.getElementById("level-select");
+  if (!levelSelect) {
+    console.error("Level select element not found");
+    return;
+  }
+
+  console.log("Updating level options to max level:", maxLevel); // Debug log
+  levelSelect.innerHTML = ""; // Clear existing options
+
+  // Always ensure at least level 1 is available
+  maxLevel = Math.max(1, maxLevel);
+
+  for (let i = 1; i <= maxLevel; i++) {
+    const option = document.createElement("option");
+    option.value = i.toString();
+    option.textContent = i.toString();
+    levelSelect.appendChild(option);
   }
 }
 
@@ -287,6 +331,9 @@ function dropPiece() {
     if (piece.pos.y === 0) {
       // Game Over
       gameOver = true;
+      piece = null;
+      nextPiece = null;
+      dropCounter = 0;
       return;
     }
     piece = nextPiece;
@@ -338,6 +385,15 @@ function hardDrop() {
   piece.pos.y--;
   mergePiece();
   clearLines();
+
+  // Check for game over
+  if (piece.pos.y === 0) {
+    gameOver = true;
+    piece = null;
+    nextPiece = null;
+    return;
+  }
+
   piece = nextPiece;
   nextPiece = createPiece();
   drawNextPiece();
@@ -350,7 +406,7 @@ function resetGame() {
   piece = null;
   nextPiece = null;
   score = 0;
-  level = 1;
+  level = parseInt(document.getElementById("level-select").value) || 1;
   gameOver = false;
   isPaused = false;
   dropCounter = 0;
@@ -358,7 +414,7 @@ function resetGame() {
 
   // Update UI
   document.getElementById("score").textContent = "0";
-  document.getElementById("level").textContent = "1";
+  document.getElementById("level").textContent = level;
 }
 
 // Function to get current game music element
@@ -426,83 +482,106 @@ function previewTrack(track) {
 
 // Initialize game
 async function init() {
-  // Apply audio settings first
-  await applyAudioSettings();
+  try {
+    // Apply audio settings first
+    await applyAudioSettings();
 
-  // Don't start the game immediately
-  resetGame();
+    // Load highest level and update level select
+    const settings = await loadSettings();
+    console.log("Loaded settings:", settings); // Debug log
 
-  // Start playing title music
-  console.log("Starting title music");
-  switchMusic(null, titleMusic);
+    // Ensure highestLevel exists in settings
+    if (typeof settings.highestLevel === "undefined") {
+      settings.highestLevel = 1;
+      await settingsManager.saveSettings(settings);
+    }
 
-  // Options button handler
-  optionsButton.addEventListener("click", () => {
-    console.log("Options button clicked");
-    // Stop title music
-    titleMusic.pause();
-    titleMusic.currentTime = 0;
+    // Update level select with available levels
+    updateLevelSelectOptions(settings.highestLevel);
 
-    // Navigate to options page
-    window.location.href = "options.html";
-  });
+    // Set the current level to 1 or the last selected level
+    const levelSelect = document.getElementById("level-select");
+    if (levelSelect && levelSelect.options.length > 0) {
+      levelSelect.value = "1"; // Default to level 1
+    }
 
-  // Play button click handler
-  playButton.addEventListener("click", () => {
-    console.log("Play button clicked");
-    startGame();
-  });
+    // Don't start the game immediately
+    resetGame();
 
-  // Event listeners
-  document.addEventListener("keydown", async (event) => {
-    if (!gameStarted || gameOver) return;
+    // Start playing title music
+    console.log("Starting title music");
+    switchMusic(null, titleMusic);
 
-    if (event.key === "p" || event.key === "P") {
-      isPaused = !isPaused;
-      if (!isPaused) {
-        // Reset lastTime to prevent huge delta on unpause
-        lastTime = performance.now();
-        dropCounter = 0;
-        // Resume game music if not in "none" mode
-        const currentMusic = await getCurrentGameMusic();
-        if (currentMusic) {
-          currentMusic.play().catch((error) => {
-            console.log("Audio playback failed:", error);
-          });
+    // Options button handler
+    optionsButton.addEventListener("click", () => {
+      console.log("Options button clicked");
+      // Stop title music
+      titleMusic.pause();
+      titleMusic.currentTime = 0;
+
+      // Navigate to options page
+      window.location.href = "options.html";
+    });
+
+    // Play button click handler
+    playButton.addEventListener("click", () => {
+      console.log("Play button clicked");
+      startGame();
+    });
+
+    // Event listeners for keyboard controls
+    document.addEventListener("keydown", async (event) => {
+      if (!gameStarted || gameOver) return;
+
+      if (event.key === "p" || event.key === "P") {
+        isPaused = !isPaused;
+        if (!isPaused) {
+          // Reset lastTime to prevent huge delta on unpause
+          lastTime = performance.now();
+          dropCounter = 0;
+          // Resume game music if not in "none" mode
+          const currentMusic = await getCurrentGameMusic();
+          if (currentMusic) {
+            currentMusic.play().catch((error) => {
+              console.log("Audio playback failed:", error);
+            });
+          }
         }
+        return;
       }
-      return;
-    }
 
-    // Don't process other keys if game is paused
-    if (isPaused) return;
+      // Don't process other keys if game is paused
+      if (isPaused) return;
 
-    switch (event.key) {
-      case "ArrowLeft":
-        piece.pos.x--;
-        if (checkCollision()) piece.pos.x++;
-        break;
-      case "ArrowRight":
-        piece.pos.x++;
-        if (checkCollision()) piece.pos.x--;
-        break;
-      case "ArrowDown":
-        piece.pos.y++;
-        if (checkCollision()) {
-          piece.pos.y--;
-        }
-        break;
-      case "ArrowUp":
-        hardDrop();
-        break;
-      case "z":
-        rotatePiece(-1);
-        break;
-      case "x":
-        rotatePiece(1);
-        break;
-    }
-  });
+      switch (event.key) {
+        case "ArrowLeft":
+          piece.pos.x--;
+          if (checkCollision()) piece.pos.x++;
+          break;
+        case "ArrowRight":
+          piece.pos.x++;
+          if (checkCollision()) piece.pos.x--;
+          break;
+        case "ArrowDown":
+          piece.pos.y++;
+          if (checkCollision()) {
+            piece.pos.y--;
+          }
+          break;
+        case "ArrowUp":
+          hardDrop();
+          break;
+        case "z":
+          rotatePiece(-1);
+          break;
+        case "x":
+          rotatePiece(1);
+          break;
+      }
+    });
+  } catch (error) {
+    console.error("Error during initialization:", error);
+  }
 }
 
 // Start game
@@ -533,9 +612,19 @@ async function startGame() {
 
 // Game loop
 async function update(time = 0) {
+  // If not started or already over, don't continue
   if (!gameStarted) return;
 
+  // Handle game over state
   if (gameOver) {
+    // Ensure game music is stopped
+    const currentMusic = await getCurrentGameMusic();
+    if (currentMusic) {
+      currentMusic.pause();
+      currentMusic.currentTime = 0;
+    }
+
+    // Draw game over overlay
     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#fff";
@@ -543,32 +632,20 @@ async function update(time = 0) {
     ctx.textAlign = "center";
     ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
 
-    // Show menu after a short delay
-    setTimeout(async () => {
+    // Return to menu after delay
+    setTimeout(() => {
       gameStarted = false;
+      gameOver = false;
+      isPaused = false;
       menuOverlay.style.display = "flex";
-      // Switch back to title music
-      switchMusic(await getCurrentGameMusic(), titleMusic);
+      switchMusic(null, titleMusic);
     }, 2000);
+
     return;
   }
 
-  if (!isPaused) {
-    const deltaTime = time - lastTime;
-    lastTime = time;
-
-    dropCounter += deltaTime;
-    if (dropCounter > 1000 - level * 50) {
-      dropPiece();
-    }
-
-    // Clear canvas
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    drawBoard();
-    drawPiece();
-  } else {
+  // Handle pause state
+  if (isPaused) {
     // Draw pause overlay
     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -578,12 +655,38 @@ async function update(time = 0) {
     ctx.textBaseline = "middle";
     ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
 
-    // Pause game music
+    // Ensure music is paused
     const currentMusic = await getCurrentGameMusic();
-    currentMusic.pause();
+    if (currentMusic) {
+      currentMusic.pause();
+    }
+
+    // Continue game loop while paused
+    requestAnimationFrame(update);
+    return;
   }
 
-  requestAnimationFrame(update);
+  // Normal game update
+  const deltaTime = time - lastTime;
+  lastTime = time;
+
+  dropCounter += deltaTime;
+  if (dropCounter > 1000 - level * 50) {
+    dropPiece();
+  }
+
+  // Clear canvas
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw game state
+  drawBoard();
+  drawPiece();
+
+  // Continue game loop only if not game over
+  if (!gameOver) {
+    requestAnimationFrame(update);
+  }
 }
 
 // Initialize the game (but don't start it)
