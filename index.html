@@ -16,6 +16,7 @@
       #game-container {
         display: flex;
         gap: 20px;
+        position: relative;
       }
 
       #game-canvas {
@@ -38,10 +39,51 @@
         margin-top: 0;
         color: #ecf0f1;
       }
+
+      #menu-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+
+      .menu-button {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        font-size: 24px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 10px;
+        transition: background-color 0.3s;
+      }
+
+      .menu-button:hover {
+        background-color: #2980b9;
+      }
+
+      .menu-title {
+        color: white;
+        font-size: 48px;
+        margin-bottom: 30px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+      }
     </style>
   </head>
   <body>
     <div id="game-container">
+      <div id="menu-overlay">
+        <h1 class="menu-title">TETRIS</h1>
+        <button class="menu-button" id="play-button">Play</button>
+      </div>
       <canvas id="game-canvas" width="300" height="600"></canvas>
       <div id="game-info">
         <div class="info-box">

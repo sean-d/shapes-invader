@@ -3,6 +3,8 @@ const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
 const nextPieceCanvas = document.getElementById("next-piece");
 const nextPieceCtx = nextPieceCanvas.getContext("2d");
+const menuOverlay = document.getElementById("menu-overlay");
+const playButton = document.getElementById("play-button");
 
 // Game constants
 const BLOCK_SIZE = 30;
@@ -50,7 +52,7 @@ const PIECES = [
 ];
 
 // Game state
-let board = createBoard();
+let board = null;
 let piece = null;
 let nextPiece = null;
 let score = 0;
@@ -59,6 +61,7 @@ let gameOver = false;
 let isPaused = false;
 let dropCounter = 0;
 let lastTime = 0;
+let gameStarted = false;
 
 // Create empty game board
 function createBoard() {
@@ -274,59 +277,31 @@ function hardDrop() {
   dropCounter = 0;
 }
 
-// Game loop
-function update(time = 0) {
-  if (gameOver) {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#fff";
-    ctx.font = "48px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
-    return;
-  }
+// Reset game state
+function resetGame() {
+  board = createBoard();
+  piece = null;
+  nextPiece = null;
+  score = 0;
+  level = 1;
+  gameOver = false;
+  isPaused = false;
+  dropCounter = 0;
+  lastTime = 0;
 
-  if (!isPaused) {
-    const deltaTime = time - lastTime;
-    lastTime = time;
-
-    dropCounter += deltaTime;
-    if (dropCounter > 1000 - level * 50) {
-      dropPiece();
-    }
-
-    // Clear canvas
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    drawBoard();
-    drawPiece();
-  } else {
-    // Draw pause overlay
-    // First draw a semi-transparent layer over the existing game state
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw PAUSED text
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 48px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
-  }
-
-  requestAnimationFrame(update);
+  // Update UI
+  document.getElementById("score").textContent = "0";
+  document.getElementById("level").textContent = "1";
 }
 
 // Initialize game
 function init() {
-  piece = createPiece();
-  nextPiece = createPiece();
-  drawNextPiece();
+  // Don't start the game immediately
+  resetGame();
 
   // Event listeners
   document.addEventListener("keydown", (event) => {
-    if (gameOver) return;
+    if (!gameStarted || gameOver) return;
 
     if (event.key === "p" || event.key === "P") {
       isPaused = !isPaused;
@@ -367,8 +342,71 @@ function init() {
         break;
     }
   });
+
+  // Play button click handler
+  playButton.addEventListener("click", startGame);
 }
 
 // Start game
+function startGame() {
+  resetGame();
+  gameStarted = true;
+  menuOverlay.style.display = "none";
+  piece = createPiece();
+  nextPiece = createPiece();
+  drawNextPiece();
+  lastTime = performance.now();
+  update();
+}
+
+// Game loop
+function update(time = 0) {
+  if (!gameStarted) return;
+
+  if (gameOver) {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#fff";
+    ctx.font = "48px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+
+    // Show menu after a short delay
+    setTimeout(() => {
+      gameStarted = false;
+      menuOverlay.style.display = "flex";
+    }, 2000);
+    return;
+  }
+
+  if (!isPaused) {
+    const deltaTime = time - lastTime;
+    lastTime = time;
+
+    dropCounter += deltaTime;
+    if (dropCounter > 1000 - level * 50) {
+      dropPiece();
+    }
+
+    // Clear canvas
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawBoard();
+    drawPiece();
+  } else {
+    // Draw pause overlay
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 48px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
+  }
+
+  requestAnimationFrame(update);
+}
+
+// Initialize the game (but don't start it)
 init();
-update();
