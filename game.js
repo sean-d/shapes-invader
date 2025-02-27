@@ -100,6 +100,7 @@ let board = null;
 let piece = null;
 let nextPiece = null;
 let score = 0;
+let lines = 0;
 let level = 1;
 let gameOver = false;
 let isPaused = false;
@@ -268,8 +269,10 @@ function clearLines() {
   }
 
   if (linesCleared > 0) {
+    lines += linesCleared;
     score += linesCleared * 100 * level;
     document.getElementById("score").textContent = score;
+    document.getElementById("lines").textContent = lines;
     if (score >= level * 1000) {
       level++;
       document.getElementById("level").textContent = level;
@@ -323,19 +326,23 @@ function updateLevelSelectOptions(maxLevel) {
 
 // Move piece down
 function dropPiece() {
+  if (!piece) return;
+
   piece.pos.y++;
   if (checkCollision()) {
     piece.pos.y--;
     mergePiece();
     clearLines();
+
+    // Check for game over
     if (piece.pos.y === 0) {
-      // Game Over
       gameOver = true;
       piece = null;
       nextPiece = null;
       dropCounter = 0;
       return;
     }
+
     piece = nextPiece;
     nextPiece = createPiece();
     drawNextPiece();
@@ -379,6 +386,8 @@ function drawNextPiece() {
 
 // Hard drop function
 function hardDrop() {
+  if (!piece) return;
+
   while (!checkCollision()) {
     piece.pos.y++;
   }
@@ -391,6 +400,7 @@ function hardDrop() {
     gameOver = true;
     piece = null;
     nextPiece = null;
+    dropCounter = 0;
     return;
   }
 
@@ -406,6 +416,7 @@ function resetGame() {
   piece = null;
   nextPiece = null;
   score = 0;
+  lines = 0;
   level = parseInt(document.getElementById("level-select").value) || 1;
   gameOver = false;
   isPaused = false;
@@ -414,6 +425,7 @@ function resetGame() {
 
   // Update UI
   document.getElementById("score").textContent = "0";
+  document.getElementById("lines").textContent = "0";
   document.getElementById("level").textContent = level;
 }
 
@@ -598,6 +610,7 @@ async function startGame() {
 
   resetGame();
   gameStarted = true;
+  gameOver = false;
   piece = createPiece();
   nextPiece = createPiece();
   drawNextPiece();
@@ -612,17 +625,25 @@ async function startGame() {
 
 // Game loop
 async function update(time = 0) {
-  // If not started or already over, don't continue
+  // Don't continue if game hasn't started
   if (!gameStarted) return;
 
-  // Handle game over state
+  // Handle game over state first
   if (gameOver) {
-    // Ensure game music is stopped
+    // Stop the game loop immediately
+    gameStarted = false;
+
+    // Stop the music
     const currentMusic = await getCurrentGameMusic();
     if (currentMusic) {
       currentMusic.pause();
       currentMusic.currentTime = 0;
     }
+
+    // Draw the final board state
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawBoard();
 
     // Draw game over overlay
     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
@@ -634,11 +655,10 @@ async function update(time = 0) {
 
     // Return to menu after delay
     setTimeout(() => {
-      gameStarted = false;
-      gameOver = false;
-      isPaused = false;
       menuOverlay.style.display = "flex";
       switchMusic(null, titleMusic);
+      gameOver = false;
+      isPaused = false;
     }, 2000);
 
     return;
@@ -661,7 +681,6 @@ async function update(time = 0) {
       currentMusic.pause();
     }
 
-    // Continue game loop while paused
     requestAnimationFrame(update);
     return;
   }
@@ -681,10 +700,10 @@ async function update(time = 0) {
 
   // Draw game state
   drawBoard();
-  drawPiece();
+  if (piece) drawPiece();
 
-  // Continue game loop only if not game over
-  if (!gameOver) {
+  // Continue the game loop only if the game is still active
+  if (gameStarted && !gameOver) {
     requestAnimationFrame(update);
   }
 }
