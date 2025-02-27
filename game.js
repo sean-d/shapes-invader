@@ -6,6 +6,7 @@ const ctx = canvas.getContext("2d");
 const nextPieceCanvas = document.getElementById("next-piece");
 const nextPieceCtx = nextPieceCanvas.getContext("2d");
 const menuOverlay = document.getElementById("menu-overlay");
+const gameOverOverlay = document.getElementById("game-over-overlay");
 const playButton = document.getElementById("play-button");
 const optionsButton = document.getElementById("options-button");
 const titleMusic = document.getElementById("title-music");
@@ -626,6 +627,35 @@ function previewTrack(track) {
   }
 }
 
+// Function to handle game over
+async function handleGameOver() {
+  // Update final score
+  document.getElementById("final-score").textContent = score;
+
+  // Show game over overlay
+  gameOverOverlay.style.display = "flex";
+
+  // Stop game music and switch back to title music after a delay
+  const currentMusic = await getCurrentGameMusic();
+  if (currentMusic) {
+    currentMusic.pause();
+    currentMusic.currentTime = 0;
+  }
+
+  // Wait 3 seconds before returning to menu
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
+  // Hide game over overlay and show menu
+  gameOverOverlay.style.display = "none";
+  menuOverlay.style.display = "flex";
+
+  // Start title music
+  switchMusic(null, titleMusic);
+
+  // Reset game state
+  resetGame();
+}
+
 // Initialize game
 async function init() {
   try {
@@ -759,7 +789,19 @@ async function startGame() {
 
 // Update game state
 async function update(time = 0) {
-  if (!gameStarted || gameOver || isPaused) {
+  if (!gameStarted) {
+    requestAnimationFrame(update);
+    return;
+  }
+
+  if (gameOver) {
+    await handleGameOver();
+    gameStarted = false;
+    requestAnimationFrame(update);
+    return;
+  }
+
+  if (isPaused) {
     requestAnimationFrame(update);
     return;
   }

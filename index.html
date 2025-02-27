@@ -54,6 +54,33 @@
         z-index: 1000;
       }
 
+      #game-over-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+
+      .game-over-text {
+        color: #e74c3c;
+        font-size: 48px;
+        margin-bottom: 20px;
+        text-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+      }
+
+      .final-score {
+        color: #fff;
+        font-size: 24px;
+        margin-bottom: 30px;
+      }
+
       .menu-button {
         background-color: #3498db;
         color: white;
@@ -169,6 +196,10 @@
         </div>
         <button class="menu-button" id="options-button">Options</button>
         <button class="menu-button" id="play-button">Play</button>
+      </div>
+      <div id="game-over-overlay">
+        <h1 class="game-over-text">GAME OVER</h1>
+        <div class="final-score">Score: <span id="final-score">0</span></div>
       </div>
       <canvas id="game-canvas" width="300" height="600"></canvas>
       <div id="game-info">
