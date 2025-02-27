@@ -109,6 +109,9 @@ let dropCounter = 0;
 let lastTime = 0;
 let gameStarted = false;
 
+// Animation state
+let lineClearAnimations = [];
+
 // Load settings
 async function loadSettings() {
   return await settingsManager.loadSettings();
@@ -258,20 +261,29 @@ function rotatePiece(dir) {
 }
 
 // Clear completed lines
-function clearLines() {
+async function clearLines() {
   let linesCleared = 0;
+  let linesToClear = [];
+
+  // First pass: identify lines to clear
   outer: for (let y = board.length - 1; y >= 0; y--) {
     for (let x = 0; x < board[y].length; x++) {
       if (board[y][x] === 0) continue outer;
     }
-
-    const row = board.splice(y, 1)[0].fill(0);
-    board.unshift(row);
+    linesToClear.push(y);
     linesCleared++;
-    y++;
   }
 
   if (linesCleared > 0) {
+    // Animate the lines before clearing them
+    await animateLinesClear(linesToClear);
+
+    // Now actually clear the lines
+    linesToClear.forEach((y) => {
+      const row = board.splice(y, 1)[0].fill(0);
+      board.unshift(row);
+    });
+
     lines += linesCleared;
     score += linesCleared * 100 * level;
     document.getElementById("score").textContent = score;
@@ -283,6 +295,80 @@ function clearLines() {
       updateHighestLevel(level);
     }
   }
+}
+
+// Animate lines being cleared
+async function animateLinesClear(lineIndices) {
+  const FLASH_DURATION = 500; // Duration of the flash animation in ms
+  const FLASH_CYCLES = 3; // Number of times to flash
+
+  return new Promise((resolve) => {
+    let startTime = performance.now();
+    let animationFrame;
+
+    function animate(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = elapsed / FLASH_DURATION;
+
+      if (progress >= 1) {
+        cancelAnimationFrame(animationFrame);
+        resolve();
+        return;
+      }
+
+      // Calculate flash intensity (oscillating between 0 and 1)
+      const flashIntensity = Math.abs(
+        Math.sin(progress * Math.PI * 2 * FLASH_CYCLES)
+      );
+
+      // Draw the board with flashing effect
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw the board with flashing lines
+      board.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            if (lineIndices.includes(y)) {
+              // Draw flashing block
+              const color = COLORS[value];
+              const flashColor = mixColors(color, "#FFFFFF", flashIntensity);
+              drawBlock(x, y, flashColor);
+            } else {
+              // Draw normal block
+              drawBlock(x, y, COLORS[value]);
+            }
+          }
+        });
+      });
+
+      // Draw current piece if it exists
+      drawPiece();
+
+      animationFrame = requestAnimationFrame(animate);
+    }
+
+    animationFrame = requestAnimationFrame(animate);
+  });
+}
+
+// Helper function to mix two colors
+function mixColors(color1, color2, ratio) {
+  const hex1 = color1.replace("#", "");
+  const hex2 = color2.replace("#", "");
+
+  const r1 = parseInt(hex1.substr(0, 2), 16);
+  const g1 = parseInt(hex1.substr(2, 2), 16);
+  const b1 = parseInt(hex1.substr(4, 2), 16);
+
+  const r2 = parseInt(hex2.substr(0, 2), 16);
+  const g2 = parseInt(hex2.substr(2, 2), 16);
+  const b2 = parseInt(hex2.substr(4, 2), 16);
+
+  const r = Math.round(r1 * (1 - ratio) + r2 * ratio);
+  const g = Math.round(g1 * (1 - ratio) + g2 * ratio);
+  const b = Math.round(b1 * (1 - ratio) + b2 * ratio);
+
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }
 
 // Update highest level reached
@@ -327,22 +413,18 @@ function updateLevelSelectOptions(maxLevel) {
   }
 }
 
-// Move piece down
-function dropPiece() {
-  if (!piece) return;
-
+// Drop piece one position
+async function dropPiece() {
   piece.pos.y++;
   if (checkCollision()) {
     piece.pos.y--;
     mergePiece();
-    clearLines();
+    await clearLines();
 
     // Check for game over
     if (piece.pos.y === 0) {
       gameOver = true;
       piece = null;
-      nextPiece = null;
-      dropCounter = 0;
       return;
     }
 
@@ -350,7 +432,6 @@ function dropPiece() {
     nextPiece = createPiece();
     drawNextPiece();
   }
-  dropCounter = 0;
 }
 
 // Draw next piece preview
@@ -387,30 +468,25 @@ function drawNextPiece() {
   });
 }
 
-// Hard drop function
-function hardDrop() {
-  if (!piece) return;
-
+// Hard drop the piece
+async function hardDrop() {
   while (!checkCollision()) {
     piece.pos.y++;
   }
   piece.pos.y--;
   mergePiece();
-  clearLines();
+  await clearLines();
 
   // Check for game over
   if (piece.pos.y === 0) {
     gameOver = true;
     piece = null;
-    nextPiece = null;
-    dropCounter = 0;
     return;
   }
 
   piece = nextPiece;
   nextPiece = createPiece();
   drawNextPiece();
-  dropCounter = 0;
 }
 
 // Reset game state
@@ -558,9 +634,9 @@ async function init() {
       startGame();
     });
 
-    // Event listeners for keyboard controls
+    // Handle keyboard events
     document.addEventListener("keydown", async (event) => {
-      if (!gameStarted || gameOver) return;
+      if (!gameStarted || !piece) return;
 
       if (event.key === "p" || event.key === "P") {
         isPaused = !isPaused;
@@ -598,7 +674,7 @@ async function init() {
           }
           break;
         case "ArrowUp":
-          hardDrop();
+          await hardDrop();
           break;
         case "z":
           rotatePiece(-1);
@@ -640,89 +716,30 @@ async function startGame() {
   update();
 }
 
-// Game loop
+// Update game state
 async function update(time = 0) {
-  // Don't continue if game hasn't started
-  if (!gameStarted) return;
-
-  // Handle game over state first
-  if (gameOver) {
-    // Stop the game loop immediately
-    gameStarted = false;
-
-    // Stop the music
-    const currentMusic = await getCurrentGameMusic();
-    if (currentMusic) {
-      currentMusic.pause();
-      currentMusic.currentTime = 0;
-    }
-
-    // Draw the final board state
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawBoard();
-
-    // Draw game over overlay
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#fff";
-    ctx.font = "48px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
-
-    // Return to menu after delay
-    setTimeout(() => {
-      menuOverlay.style.display = "flex";
-      switchMusic(null, titleMusic);
-      gameOver = false;
-      isPaused = false;
-    }, 2000);
-
-    return;
-  }
-
-  // Handle pause state
-  if (isPaused) {
-    // Draw pause overlay
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 48px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
-
-    // Ensure music is paused
-    const currentMusic = await getCurrentGameMusic();
-    if (currentMusic) {
-      currentMusic.pause();
-    }
-
+  if (!gameStarted || gameOver || isPaused) {
     requestAnimationFrame(update);
     return;
   }
 
-  // Normal game update
   const deltaTime = time - lastTime;
   lastTime = time;
-
   dropCounter += deltaTime;
-  if (dropCounter > 1000 - level * 50) {
-    dropPiece();
+
+  if (dropCounter > 1000 - (level - 1) * 50) {
+    await dropPiece();
+    dropCounter = 0;
   }
 
   // Clear canvas
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Draw game state
   drawBoard();
-  if (piece) drawPiece();
+  drawPiece();
 
-  // Continue the game loop only if the game is still active
-  if (gameStarted && !gameOver) {
-    requestAnimationFrame(update);
-  }
+  requestAnimationFrame(update);
 }
 
 // Initialize the game (but don't start it)
