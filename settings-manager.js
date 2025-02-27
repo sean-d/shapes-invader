@@ -2,7 +2,6 @@
 const defaultSettings = {
   gameMusic: "classic1",
   musicVolume: 40,
-  sfxVolume: 100,
   highestLevel: 1,
   menuMusicEnabled: true,
 };

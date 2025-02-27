@@ -6,10 +6,8 @@ const previewMusic2 = document.getElementById("preview-music-2");
 const previewMusic3 = document.getElementById("preview-music-3");
 const musicButtons = document.querySelectorAll(".music-button");
 const musicVolume = document.getElementById("music-volume");
-const sfxVolume = document.getElementById("sfx-volume");
 const backButton = document.getElementById("back-button");
 const musicValueDisplay = document.getElementById("music-value");
-const sfxValueDisplay = document.getElementById("sfx-value");
 const menuMusicToggle = document.getElementById("menu-music-toggle");
 
 // Preview timeout
@@ -19,7 +17,6 @@ let previewTimeout = null;
 const defaultSettings = {
   gameMusic: "classic1",
   musicVolume: 100,
-  sfxVolume: 100,
   menuMusicEnabled: true,
 };
 
@@ -29,14 +26,15 @@ async function loadSettings() {
 }
 
 // Save settings
-async function saveSettings(settings) {
+async function saveSettings() {
+  const settings = {
+    gameMusic:
+      Array.from(musicButtons).find((btn) => btn.classList.contains("selected"))
+        ?.dataset.track || "classic1",
+    musicVolume: parseInt(musicVolume.value),
+    menuMusicEnabled: menuMusicToggle.checked,
+  };
   await settingsManager.saveSettings(settings);
-}
-
-// Update value displays
-function updateValueDisplays() {
-  musicValueDisplay.textContent = musicVolume.value;
-  sfxValueDisplay.textContent = sfxVolume.value;
 }
 
 // Apply settings to UI
@@ -51,7 +49,6 @@ async function applySettings(settings) {
 
   // Set volume values
   musicVolume.value = settings.musicVolume;
-  sfxVolume.value = settings.sfxVolume;
   updateValueDisplays();
 
   // Set menu music toggle
@@ -63,100 +60,93 @@ async function applySettings(settings) {
   previewMusic3.volume = settings.musicVolume / 100;
 }
 
-// Handle music button clicks
-musicButtons.forEach((button) => {
-  button.addEventListener("click", async () => {
-    // Update selection
-    musicButtons.forEach((b) => b.classList.remove("selected"));
-    button.classList.add("selected");
+// Update value displays
+function updateValueDisplays() {
+  musicValueDisplay.textContent = musicVolume.value;
+}
 
-    // Stop any playing preview
-    if (previewTimeout) {
-      clearTimeout(previewTimeout);
-      previewMusic1.pause();
-      previewMusic2.pause();
-      previewMusic3.pause();
-      previewMusic1.currentTime = 0;
-      previewMusic2.currentTime = 0;
-      previewMusic3.currentTime = 0;
-    }
-
-    // Play preview of selected track
-    let track;
-    switch (button.dataset.track) {
-      case "classic1":
-        track = previewMusic1;
-        break;
-      case "classic2":
-        track = previewMusic2;
-        break;
-      case "heights":
-        track = previewMusic3;
-        break;
-      default:
-        track = previewMusic1;
-    }
-    track.play();
-
-    // Stop preview after 10 seconds
-    previewTimeout = setTimeout(() => {
-      track.pause();
-      track.currentTime = 0;
-    }, 10000);
-
-    // Save settings
+// Initialize
+async function init() {
+  try {
     const settings = await loadSettings();
-    settings.gameMusic = button.dataset.track;
-    await saveSettings(settings);
-  });
-});
+    await applySettings(settings);
 
-// Handle volume changes
-musicVolume.addEventListener("input", async () => {
-  updateValueDisplays();
-  const settings = await settingsManager.loadSettings();
-  settings.musicVolume = parseInt(musicVolume.value);
-  await settingsManager.saveSettings(settings);
+    // Add event listeners
+    musicButtons.forEach((button) => {
+      button.addEventListener("click", async () => {
+        // Update selection
+        musicButtons.forEach((btn) => btn.classList.remove("selected"));
+        button.classList.add("selected");
 
-  // Update preview volumes
-  previewMusic1.volume = settings.musicVolume / 100;
-  previewMusic2.volume = settings.musicVolume / 100;
-  previewMusic3.volume = settings.musicVolume / 100;
-});
+        // Stop any playing preview
+        if (previewTimeout) {
+          clearTimeout(previewTimeout);
+          previewMusic1.pause();
+          previewMusic2.pause();
+          previewMusic3.pause();
+          previewMusic1.currentTime = 0;
+          previewMusic2.currentTime = 0;
+          previewMusic3.currentTime = 0;
+        }
 
-sfxVolume.addEventListener("input", async () => {
-  updateValueDisplays();
-  const settings = await settingsManager.loadSettings();
-  settings.sfxVolume = parseInt(sfxVolume.value);
-  await settingsManager.saveSettings(settings);
-});
+        // Play preview of selected track
+        let track;
+        switch (button.dataset.track) {
+          case "classic1":
+            track = previewMusic1;
+            break;
+          case "classic2":
+            track = previewMusic2;
+            break;
+          case "heights":
+            track = previewMusic3;
+            break;
+          default:
+            track = previewMusic1;
+        }
+        track.play();
 
-// Handle back button
-backButton.addEventListener("click", () => {
-  // Stop any playing preview
-  if (previewTimeout) {
-    clearTimeout(previewTimeout);
-    previewMusic1.pause();
-    previewMusic2.pause();
-    previewMusic3.pause();
-    previewMusic1.currentTime = 0;
-    previewMusic2.currentTime = 0;
-    previewMusic3.currentTime = 0;
+        // Stop preview after 10 seconds
+        previewTimeout = setTimeout(() => {
+          track.pause();
+          track.currentTime = 0;
+        }, 10000);
+
+        await saveSettings();
+      });
+    });
+
+    musicVolume.addEventListener("input", async () => {
+      updateValueDisplays();
+      // Update preview volumes
+      const volume = musicVolume.value / 100;
+      previewMusic1.volume = volume;
+      previewMusic2.volume = volume;
+      previewMusic3.volume = volume;
+      await saveSettings();
+    });
+
+    menuMusicToggle.addEventListener("change", async () => {
+      await saveSettings();
+    });
+
+    backButton.addEventListener("click", () => {
+      // Stop any playing preview
+      if (previewTimeout) {
+        clearTimeout(previewTimeout);
+        previewMusic1.pause();
+        previewMusic2.pause();
+        previewMusic3.pause();
+        previewMusic1.currentTime = 0;
+        previewMusic2.currentTime = 0;
+        previewMusic3.currentTime = 0;
+      }
+      window.location.href = "index.html";
+    });
+  } catch (error) {
+    console.error("Error initializing options:", error);
   }
+}
 
-  // Go back to main menu
-  window.location.href = "index.html";
-});
-
-// Handle menu music toggle
-menuMusicToggle.addEventListener("change", async () => {
-  const settings = await loadSettings();
-  settings.menuMusicEnabled = menuMusicToggle.checked;
-  await saveSettings(settings);
-});
-
-// Initialize settings
-(async () => {
-  const settings = await loadSettings();
-  await applySettings(settings);
-})();
+// Start initialization
+init();
