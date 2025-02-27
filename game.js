@@ -114,6 +114,17 @@ let gameStarted = false;
 // Animation state
 let lineClearAnimations = [];
 
+// Get pause menu elements
+const pauseMusicVolume = document.getElementById("pause-music-volume");
+const pauseMusicValue = document.getElementById("pause-music-value");
+
+// Function to update pause menu values
+async function updatePauseMenuValues() {
+  const settings = await loadSettings();
+  pauseMusicVolume.value = settings.musicVolume;
+  pauseMusicValue.textContent = settings.musicVolume;
+}
+
 // Load settings
 async function loadSettings() {
   return await settingsManager.loadSettings();
@@ -707,6 +718,20 @@ async function init() {
       startGame();
     });
 
+    // Add pause menu event listeners
+    pauseMusicVolume.addEventListener("input", async () => {
+      const volume = pauseMusicVolume.value;
+      pauseMusicValue.textContent = volume;
+
+      // Update settings
+      const settings = await loadSettings();
+      settings.musicVolume = parseInt(volume);
+      await settingsManager.saveSettings(settings);
+
+      // Apply new volume
+      await applyAudioSettings();
+    });
+
     // Handle keyboard events
     document.addEventListener("keydown", async (event) => {
       if (!gameStarted || !piece) return;
@@ -719,6 +744,9 @@ async function init() {
         const currentMusic = await getCurrentGameMusic();
 
         if (isPaused) {
+          // Update pause menu values
+          await updatePauseMenuValues();
+
           // Clear next piece preview when paused
           nextPieceCtx.clearRect(
             0,
