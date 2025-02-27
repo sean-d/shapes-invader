@@ -278,12 +278,21 @@ async function clearLines() {
     // Animate the lines before clearing them
     await animateLinesClear(linesToClear);
 
-    // Now actually clear the lines
+    // After animation completes, clear all lines at once
+    // Sort lines in descending order to remove from bottom up
+    linesToClear.sort((a, b) => b - a);
+
+    // Remove all lines at once
     linesToClear.forEach((y) => {
-      const row = board.splice(y, 1)[0].fill(0);
-      board.unshift(row);
+      board.splice(y, 1);
     });
 
+    // Add new empty lines at the top
+    for (let i = 0; i < linesCleared; i++) {
+      board.unshift(Array(BOARD_WIDTH).fill(0));
+    }
+
+    // Update score and level
     lines += linesCleared;
     score += linesCleared * 100 * level;
     document.getElementById("score").textContent = score;
@@ -291,10 +300,12 @@ async function clearLines() {
     if (score >= level * 1000) {
       level++;
       document.getElementById("level").textContent = level;
-      // Update highest level if we've reached a new high
       updateHighestLevel(level);
     }
   }
+
+  // Return true if lines were cleared
+  return linesCleared > 0;
 }
 
 // Animate lines being cleared
@@ -302,16 +313,29 @@ async function animateLinesClear(lineIndices) {
   const FLASH_DURATION = 500; // Duration of the flash animation in ms
   const FLASH_CYCLES = 3; // Number of times to flash
 
+  // Cancel any existing animation
+  if (window.currentLineAnimation) {
+    cancelAnimationFrame(window.currentLineAnimation);
+  }
+
   return new Promise((resolve) => {
     let startTime = performance.now();
     let animationFrame;
 
     function animate(currentTime) {
+      // Don't continue animation if game is paused or over
+      if (isPaused || gameOver) {
+        cancelAnimationFrame(animationFrame);
+        resolve();
+        return;
+      }
+
       const elapsed = currentTime - startTime;
       const progress = elapsed / FLASH_DURATION;
 
       if (progress >= 1) {
         cancelAnimationFrame(animationFrame);
+        window.currentLineAnimation = null;
         resolve();
         return;
       }
@@ -324,30 +348,42 @@ async function animateLinesClear(lineIndices) {
       // Draw the board with flashing effect
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw the board with flashing lines
-      board.forEach((row, y) => {
-        row.forEach((value, x) => {
-          if (value !== 0) {
-            if (lineIndices.includes(y)) {
-              // Draw flashing block
-              const color = COLORS[value];
-              const flashColor = mixColors(color, "#FFFFFF", flashIntensity);
-              drawBlock(x, y, flashColor);
-            } else {
-              // Draw normal block
-              drawBlock(x, y, COLORS[value]);
+      try {
+        // Draw the board with flashing lines
+        board.forEach((row, y) => {
+          row.forEach((value, x) => {
+            if (value !== 0) {
+              if (lineIndices.includes(y)) {
+                // Draw flashing block
+                const color = COLORS[value];
+                const flashColor = mixColors(color, "#FFFFFF", flashIntensity);
+                drawBlock(x, y, flashColor);
+              } else {
+                // Draw normal block
+                drawBlock(x, y, COLORS[value]);
+              }
             }
-          }
+          });
         });
-      });
 
-      // Draw current piece if it exists
-      drawPiece();
+        // Draw current piece if it exists
+        if (piece) {
+          drawPiece();
+        }
+      } catch (error) {
+        console.error("Error during line clear animation:", error);
+        cancelAnimationFrame(animationFrame);
+        window.currentLineAnimation = null;
+        resolve();
+        return;
+      }
 
       animationFrame = requestAnimationFrame(animate);
+      window.currentLineAnimation = animationFrame;
     }
 
     animationFrame = requestAnimationFrame(animate);
+    window.currentLineAnimation = animationFrame;
   });
 }
 
@@ -419,15 +455,18 @@ async function dropPiece() {
   if (checkCollision()) {
     piece.pos.y--;
     mergePiece();
-    await clearLines();
 
-    // Check for game over
+    // Wait for line clearing to complete before continuing
+    const linesWereCleared = await clearLines();
+
+    // Only proceed with next piece if game isn't over
     if (piece.pos.y === 0) {
       gameOver = true;
       piece = null;
       return;
     }
 
+    // Set next piece
     piece = nextPiece;
     nextPiece = createPiece();
     drawNextPiece();
@@ -475,9 +514,11 @@ async function hardDrop() {
   }
   piece.pos.y--;
   mergePiece();
-  await clearLines();
 
-  // Check for game over
+  // Wait for line clearing to complete before continuing
+  const linesWereCleared = await clearLines();
+
+  // Only proceed with next piece if game isn't over
   if (piece.pos.y === 0) {
     gameOver = true;
     piece = null;
