@@ -11,6 +11,7 @@ const optionsButton = document.getElementById("options-button");
 const titleMusic = document.getElementById("title-music");
 const gameMusic = document.getElementById("game-music");
 const gameMusicOther = document.getElementById("game-music-other");
+const gameMusicHeights = document.getElementById("game-music-heights");
 
 // Debug music elements
 console.log("Title music element:", titleMusic);
@@ -122,12 +123,14 @@ async function applyAudioSettings() {
   titleMusic.volume = musicVolume;
   gameMusic.volume = musicVolume;
   gameMusicOther.volume = musicVolume;
+  gameMusicHeights.volume = musicVolume;
 
   console.log("Applied volume settings:", {
     musicVolume: settings.musicVolume,
     titleMusicVolume: titleMusic.volume,
     gameMusicVolume: gameMusic.volume,
     gameMusicOtherVolume: gameMusicOther.volume,
+    gameMusicHeightsVolume: gameMusicHeights.volume,
   });
 }
 
@@ -437,6 +440,8 @@ async function getCurrentGameMusic() {
       return gameMusic;
     case "classic2":
       return gameMusicOther;
+    case "heights":
+      return gameMusicHeights;
     default:
       return gameMusic;
   }
@@ -451,7 +456,15 @@ function switchMusic(from, to) {
 
   if (to) {
     // Apply current volume settings before playing
-    applyAudioSettings().then(() => {
+    applyAudioSettings().then(async () => {
+      // Check if we're switching to title music and menu music is disabled
+      if (to === titleMusic) {
+        const settings = await loadSettings();
+        if (!settings.menuMusicEnabled) {
+          return; // Don't play title music if disabled
+        }
+      }
+
       to.play().catch((error) => {
         console.error(`Error playing audio:`, error);
       });
@@ -471,12 +484,16 @@ function previewTrack(track) {
   gameMusic.currentTime = 0;
   gameMusicOther.pause();
   gameMusicOther.currentTime = 0;
+  gameMusicHeights.pause();
+  gameMusicHeights.currentTime = 0;
 
   const trackElement =
     track === "traditional"
       ? gameMusic
       : track === "other"
       ? gameMusicOther
+      : track === "heights"
+      ? gameMusicHeights
       : null;
 
   if (trackElement) {

@@ -4,6 +4,7 @@ const defaultSettings = {
   musicVolume: 40,
   sfxVolume: 100,
   highestLevel: 1,
+  menuMusicEnabled: true,
 };
 
 class SettingsManager {
