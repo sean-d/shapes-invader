@@ -22,6 +22,9 @@ if (process.platform === "darwin") {
   });
 }
 
+// Global reference to the window object
+let win;
+
 // Get the user's app data directory
 function getSettingsPath() {
   const appDataPath =
@@ -80,7 +83,7 @@ async function saveSettings(settings) {
 
 // Create the browser window
 function createWindow() {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 800,
     height: 800,
     webPreferences: {
@@ -90,6 +93,12 @@ function createWindow() {
   });
 
   win.loadFile("index.html");
+
+  // Add window close handler
+  win.on("closed", () => {
+    win = null;
+    app.quit();
+  });
 }
 
 // When Electron is ready

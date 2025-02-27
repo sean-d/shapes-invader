@@ -672,6 +672,30 @@ async function handleGameOver() {
 // Initialize game
 async function init() {
   try {
+    // Add window close handlers for Electron
+    if (window.electron) {
+      window.electron.onAppClosing(() => {
+        // Stop all music
+        titleMusic.pause();
+        gameMusic.pause();
+        gameMusicOther.pause();
+        gameMusicHeights.pause();
+      });
+    }
+
+    // Handle Command+Q on macOS
+    document.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "q") {
+        // Stop all music
+        titleMusic.pause();
+        gameMusic.pause();
+        gameMusicOther.pause();
+        gameMusicHeights.pause();
+        // Close the window
+        window.close();
+      }
+    });
+
     // Apply audio settings first
     await applyAudioSettings();
 
