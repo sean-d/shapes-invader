@@ -2,6 +2,26 @@ const { app, BrowserWindow, ipcMain, contextBridge } = require("electron");
 const path = require("path");
 const fs = require("fs").promises;
 
+// Enable secure restorable state for macOS
+if (process.platform === "darwin") {
+  // Set the property as early as possible
+  app.applicationSupportsSecureRestorableState = true;
+
+  // Also set it via the delegate pattern
+  Object.defineProperty(app, "NSApplicationDelegate", {
+    configurable: false,
+    enumerable: true,
+    value: {
+      applicationSupportsSecureRestorableState: () => true,
+    },
+  });
+
+  // And ensure it's set when the app is launching
+  app.on("will-finish-launching", () => {
+    app.applicationSupportsSecureRestorableState = true;
+  });
+}
+
 // Get the user's app data directory
 function getSettingsPath() {
   const appDataPath =
