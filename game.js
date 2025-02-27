@@ -7,6 +7,7 @@ const nextPieceCanvas = document.getElementById("next-piece");
 const nextPieceCtx = nextPieceCanvas.getContext("2d");
 const menuOverlay = document.getElementById("menu-overlay");
 const gameOverOverlay = document.getElementById("game-over-overlay");
+const pauseOverlay = document.getElementById("pause-overlay");
 const playButton = document.getElementById("play-button");
 const optionsButton = document.getElementById("options-button");
 const titleMusic = document.getElementById("title-music");
@@ -543,6 +544,7 @@ function resetGame() {
   isPaused = false;
   dropCounter = 0;
   lastTime = 0;
+  pauseOverlay.style.display = "none";
 
   // Update UI
   document.getElementById("score").textContent = "0";
@@ -711,12 +713,37 @@ async function init() {
 
       if (event.key === "p" || event.key === "P") {
         isPaused = !isPaused;
-        if (!isPaused) {
+        pauseOverlay.style.display = isPaused ? "flex" : "none";
+
+        // Get current game music
+        const currentMusic = await getCurrentGameMusic();
+
+        if (isPaused) {
+          // Clear next piece preview when paused
+          nextPieceCtx.clearRect(
+            0,
+            0,
+            nextPieceCanvas.width,
+            nextPieceCanvas.height
+          );
+          nextPieceCtx.fillStyle = "#000";
+          nextPieceCtx.fillRect(
+            0,
+            0,
+            nextPieceCanvas.width,
+            nextPieceCanvas.height
+          );
+          // Pause the music
+          if (currentMusic) {
+            currentMusic.pause();
+          }
+        } else {
           // Reset lastTime to prevent huge delta on unpause
           lastTime = performance.now();
           dropCounter = 0;
-          // Resume game music if not in "none" mode
-          const currentMusic = await getCurrentGameMusic();
+          // Redraw next piece preview
+          drawNextPiece();
+          // Resume game music
           if (currentMusic) {
             currentMusic.play().catch((error) => {
               console.log("Audio playback failed:", error);
@@ -779,6 +806,7 @@ async function startGame() {
   nextPiece = createPiece();
   drawNextPiece();
   menuOverlay.style.display = "none";
+  pauseOverlay.style.display = "none";
 
   // Switch to game music
   switchMusic(titleMusic, gameTrackElement);
@@ -802,6 +830,10 @@ async function update(time = 0) {
   }
 
   if (isPaused) {
+    // Clear canvas when paused
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     requestAnimationFrame(update);
     return;
   }
